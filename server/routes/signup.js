@@ -17,7 +17,7 @@ function sendHatchetMessage(url, json, form) {
   })
 }
 
-module.exports = async function signupRoutes(transaction, callback) {
+module.exports = async function signupRoutes(transaction) {
   const payload = {
     format: 'html',
     lang: transaction.locale,

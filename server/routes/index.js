@@ -1,11 +1,11 @@
 const iron = require('iron');
-var signup = require('./signup');
-var mailchimp = require('./mailchimp');
-var stripe = require('./stripe');
-var paypal = require('./paypal');
-var boom = require('boom');
-var basket = require('../lib/basket-queue.js');
-var amountModifier = require('../../dist/lib/amount-modifier.js');
+const listSignup = require('./signup');
+const mailchimpSignup = require('./mailchimp');
+const stripe = require('./stripe');
+const paypal = require('./paypal');
+const boom = require('boom');
+const basket = require('../lib/basket-queue.js');
+const amountModifier = require('../../dist/lib/amount-modifier.js');
 
 const cookiePassword = process.env.SECRET_COOKIE_PASSWORD;
 
@@ -25,15 +25,40 @@ async function encrypt(cookie) {
   }
 }
 
-var routes = {
-  'signup': async function(request, h) {
-    var transaction = request.payload;
+const signup = async function(request, h) {
+  const transaction = request.payload;
+  const signup_service = Date.now();
+
+  try {
+    const payload = await listSignup(transaction);
+  } catch (err) {
+    request.log(['error', 'signup'], {
+      request_id: request.headers['x-request-id'],
+      service: Date.now() - signup_service,
+      code: err.code,
+      type: err.type,
+      param: err.param
+    });
+
+    return boom.wrap(err, 500, 'Unable to complete Basket signup');
+  }
+
+  request.log(['signup'], {
+    request_id: request.headers['x-request-id'],
+    service: Date.now() - signup_service
+  });
+
+  return h.response(payload).code(201);
+}
+
+const mailchimp = async function(request, h) {
+    const transaction = request.payload;
     const signup_service = Date.now();
 
     try {
-      const payload = await signup(transaction);
+      const payload = await mailchimpSignup(transaction);
     } catch (err) {
-      request.log(['error', 'signup'], {
+      request.log(['error', 'mailchimp'], {
         request_id: request.headers['x-request-id'],
         service: Date.now() - signup_service,
         code: err.code,
@@ -41,52 +66,34 @@ var routes = {
         param: err.param
       });
 
-      return boom.wrap(err, 500, 'Unable to complete Basket signup');
+      return boom.wrap(err, 500, 'Unable to complete Mailchimp signup');
     }
 
-    request.log(['signup'], {
+
+    var body = JSON.parse(payload.body);
+
+    if (payload.statusCode !== 200) {
+      request.log(['error', 'mailchimp'], {
+        request_id: request.headers['x-request-id'],
+        service: Date.now() - signup_service,
+        code: payload.statusCode,
+        message: body.title
+      });
+
+      return boom.create(payload.statusCode, 'Unable to complete Mailchimp signup', body);
+    }
+
+    request.log(['mailchimp'], {
       request_id: request.headers['x-request-id'],
       service: Date.now() - signup_service
     });
 
-    return h.response(payload).code(201);
-  },
+    return h.response(body).code(201);
+  }
 
-  'mailchimp': function(request, reply) {
-    var transaction = request.payload;
-    const signup_service = Date.now();
-
-    mailchimp(transaction, function(err, payload) {
-      if (err) {
-        request.log(['error', 'mailchimp'], {
-          request_id: request.headers['x-request-id'],
-          service: Date.now() - signup_service,
-          code: err.code,
-          type: err.type,
-          param: err.param
-        });
-
-        return reply(boom.wrap(err, 500, 'Unable to complete Mailchimp signup'));
-      }
-      var body = JSON.parse(payload.body);
-      if (payload.statusCode !== 200) {
-        request.log(['error', 'mailchimp'], {
-          request_id: request.headers['x-request-id'],
-          service: Date.now() - signup_service,
-          code: payload.statusCode,
-          message: body.title
-        });
-
-        return reply(boom.create(payload.statusCode, 'Unable to complete Mailchimp signup', body));
-      }
-
-      request.log(['mailchimp'], {
-        request_id: request.headers['x-request-id'],
-        service: Date.now() - signup_service
-      });
-      reply(body).code(201);
-    });
-  },
+const routes = {
+  signup,
+  mailchimp,
   'stripe': function(request, reply) {
     var transaction = request.payload || {};
     var currency = transaction.currency;
