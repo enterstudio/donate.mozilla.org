@@ -53,7 +53,7 @@ describe('redirects', () => {
     }
   ];
 
-  var instance = server({ useDomains: false });
+  var instance = server();
 
   redirects.forEach((item) => {
     it(`url ${item.url} should redirect to location ${item.location}`, (done) => {

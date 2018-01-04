@@ -1,7 +1,7 @@
 var server = require('../../server');
 var should = require('should');
 
-var instance = server({ useDomains: false });
+var instance = server();
 process.env.HATCHET_NO_LOG = true;
 
 describe('/api/signup/basket', () => {

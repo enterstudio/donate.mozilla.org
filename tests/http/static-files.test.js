@@ -225,7 +225,7 @@ describe('static files', () => {
     }
   };
 
-  var instance = server({ useDomains: false });
+  var instance = server();
 
   Object.keys(files).forEach((key) => {
     it(`should return okay when accessing ${key}`, (done) => {

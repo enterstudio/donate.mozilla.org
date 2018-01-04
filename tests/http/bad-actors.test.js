@@ -1,6 +1,6 @@
 var server = require('../../server');
 var should = require('should');
-var instance = server({ useDomains: false });
+var instance = server();
 
 describe('bad actors', () => {
   it('should not 500 when accessing /����%20wwwroot.rar', (done) => {

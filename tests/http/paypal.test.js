@@ -2,7 +2,7 @@ var server = require('../../server');
 var should = require('should');
 
 describe('/api/paypal', () => {
-  var instance = server({ useDomains: false });
+  var instance = server();
 
   it('should return 400 when invalid currency is used', (done) => {
     instance.inject({

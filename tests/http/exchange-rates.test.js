@@ -2,7 +2,7 @@ var server = require('../../server');
 var should = require('should');
 
 describe('test exchange rates api', () => {
-  var instance = server({ useDomains: false });
+  var instance = server();
   var type = 'application/json; charset=utf-8';
 
   var cache = 'max-age=300, must-revalidate, public';
