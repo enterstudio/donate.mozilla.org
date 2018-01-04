@@ -1,8 +1,24 @@
-var hatchet = require('hatchet');
-var url = process.env.SIGNUP;
+const hatchet = require('hatchet');
+const url = process.env.SIGNUP;
 
-var signupRoutes = function(transaction, callback) {
-  var payload = {
+function sendHatchetMessage(url, json, form) {
+  return new Promise((resolve, reject) => {
+    hatchet.send(
+      "send_post_request",
+      { url, json, form },
+      (err, response) => {
+        if (err) {
+          return reject(err);
+        }
+
+        resolve(payload);
+      }
+    );
+  })
+}
+
+module.exports = async function signupRoutes(transaction, callback) {
+  const payload = {
     format: 'html',
     lang: transaction.locale,
     newsletters: 'mozilla-foundation',
@@ -12,13 +28,5 @@ var signupRoutes = function(transaction, callback) {
     country: transaction.country
   };
 
-  hatchet.send("send_post_request", {
-    url: url,
-    json: true,
-    form: payload
-  }, (hatchet_error, response) => {
-    callback(hatchet_error, payload);
-  });
+  return await sendHatchetMessage(url, true, payload);
 };
-
-module.exports = signupRoutes;

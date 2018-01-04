@@ -2,6 +2,9 @@ module.exports = function getServerOptions(options) {
   options = options || {};
 
   return {
+    address: process.env.HOST,
+    port: process.env.PORT,
+    uri: process.env.APPLICATION_URI,
     routes: {
       security: {
         hsts: {
