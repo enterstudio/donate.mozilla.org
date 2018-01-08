@@ -1,9 +1,8 @@
 const iron = require('iron');
-const listSignup = require('./signup');
+const boom = require('boom');
 const mailchimpSignup = require('./mailchimp');
 const stripe = require('./stripe');
 const paypal = require('./paypal');
-const boom = require('boom');
 const basket = require('../lib/basket-queue.js');
 const amountModifier = require('../../dist/lib/amount-modifier.js');
 
@@ -25,31 +24,6 @@ async function encrypt(cookie) {
   }
 }
 
-const signup = async function(request, h) {
-  const transaction = request.payload;
-  const signup_service = Date.now();
-
-  try {
-    const payload = await listSignup(transaction);
-  } catch (err) {
-    request.log(['error', 'signup'], {
-      request_id: request.headers['x-request-id'],
-      service: Date.now() - signup_service,
-      code: err.code,
-      type: err.type,
-      param: err.param
-    });
-
-    return boom.wrap(err, 500, 'Unable to complete Basket signup');
-  }
-
-  request.log(['signup'], {
-    request_id: request.headers['x-request-id'],
-    service: Date.now() - signup_service
-  });
-
-  return h.response(payload).code(201);
-}
 
 const mailchimp = async function(request, h) {
     const transaction = request.payload;
@@ -92,7 +66,7 @@ const mailchimp = async function(request, h) {
   }
 
 const routes = {
-  signup,
+  signup: require('./signup'),
   mailchimp,
   'stripe': function(request, reply) {
     var transaction = request.payload || {};
