@@ -11,7 +11,6 @@ const finalizeServer = require('./finalise-server');
 
 const ONE_HOUR_MS = 1000 * 60 * 60;
 
-
 module.exports = async function(options) {
   const serverOptions = getServerOptions(options);
   const server = new Hapi.Server(serverOptions);
@@ -19,7 +18,7 @@ module.exports = async function(options) {
   await server.register(require("hapi-auth-bearer-token"));
 
   server.auth.strategy("stripe", "bearer-access-token", {
-    validateFunc: async function(request, token, h) {
+    validate: async (request, token, h) => {
       const isValid = token === process.env.STRIPE_WEBHOOK_SECRET;
       const credentials = { token: token };
       return { isValid, credentials };

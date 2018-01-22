@@ -3,7 +3,7 @@ var donateServer = require('./server');
 var workers = process.env.WEB_CONCURRENCY || 1;
 
 async function start() {
-  var server = donateServer();
+  var server = await donateServer();
 
   await server.start();
   server.log('info', 'Running server at: ' + server.info.uri);

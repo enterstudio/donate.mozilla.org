@@ -1,9 +1,7 @@
-var goodConfig = {
-  reporter: require('good-console-logfmt')
-};
+let squeezeArgs;
 
 if (process.env.NPM_CONFIG_PRODUCTION === 'true') {
-  goodConfig.events = {
+  squeezeArgs = {
     error: '*',
     request: [
       'signup',
@@ -13,7 +11,7 @@ if (process.env.NPM_CONFIG_PRODUCTION === 'true') {
     ]
   };
 } else {
-  goodConfig.events = {
+  squeezeArgs = {
     response: '*',
     log: '*',
     request: [
@@ -26,20 +24,27 @@ if (process.env.NPM_CONFIG_PRODUCTION === 'true') {
 }
 
 var services = [
+  {plugin: require('inert')},
   {
-    register: require('inert')
-  },
-  {
-    register: require('good'),
+    plugin: require('good'),
     options: {
-      reporters: [goodConfig]
+      ops: false,
+      reporters: {
+        defaultReporter: [{
+          module: 'good-squeeze',
+          name: 'Squeeze',
+          args: [squeezeArgs]
+        },
+        {
+          module: 'good-console'
+        },
+        'stdout'
+      ]}
     }
   },
+  {plugin: require('scooter')},
   {
-    register: require('scooter')
-  },
-  {
-    register: require('blankie'),
+    plugin: require('blankie'),
     options: {
       connectSrc: ['self', 'https://checkout.stripe.com', '206878104.log.optimizely.com', 'https://api.stripe.com', 'https://pontoon.mozilla.org'],
       fontSrc: ['self', 'https://fonts.gstatic.com', 'https://maxcdn.bootstrapcdn.com', 'https://pontoon.mozilla.org'],
