@@ -44,8 +44,8 @@ var hashedFileRoutes = function() {
     hashedPaths.push({
       method: 'GET',
       path: item,
-      handler: function(request, reply) {
-        reply.file(files[item]);
+      handler: {
+        file: files[item]
       },
       config: {
         cache
@@ -56,8 +56,8 @@ var hashedFileRoutes = function() {
   hashedPaths.push({
     method: 'GET',
     path: '/main.{id}.js',
-    handler: function(request, reply) {
-      reply.file(pathify('public', fileHashes.main.js));
+    handler: {
+      file: pathify('public', fileHashes.main.js)
     },
     config: {
       cache
@@ -65,8 +65,8 @@ var hashedFileRoutes = function() {
   }, {
     method: 'GET',
     path: '/style.{id}.css',
-    handler: function(request, reply) {
-      reply.file(pathify('public', fileHashes.main.css));
+    handler: {
+      file: pathify('public', fileHashes.main.css)
     },
     config: {
       cache
