@@ -40,7 +40,7 @@ const mailchimp = async function(request, h) {
       param: err.param
     });
 
-    return Boom.Boomify(err, 500, 'Unable to complete Mailchimp signup');
+    return Boom.boomify(err, 500, 'Unable to complete Mailchimp signup');
   }
 
 
@@ -414,7 +414,7 @@ const routes = {
       .unstate("session")
       .code(200);
   },
-  'paypal': function(request, reply) {
+  'paypal': async function(request, h) {
     var transaction = request.payload || {};
     var frequency = transaction.frequency || "";
     var currency = transaction.currency;
@@ -432,33 +432,45 @@ const routes = {
     var request_id = request.headers['x-request-id'];
     function callback(err, data) {
       var paypal_request_sale_service = data.paypal_request_sale_service;
-      var log_details = {
-        request_id,
-        paypal_request_sale_service
-      };
 
       if (err) {
-        log_details.error = err.toString();
-
-        if (data.response) {
-          log_details.error_name = data.response.name;
-          log_details.error_message = data.response.message;
-          log_details.details = data.response.details;
-        }
-
-        request.log(['paypal', 'sale', 'error', frequency], log_details);
-        reply(Boom.Boomify(err, 500, 'Paypal donation failed'));
       } else {
-        request.log(['paypal', 'sale', frequency], log_details);
-        reply({
-          endpoint: process.env.PAYPAL_ENDPOINT,
-          token: data.response.TOKEN
-        }).code(200);
       }
     }
-    paypal.setupCheckout(details, callback);
+    const paypalRequestSaleStart = Date.now();
+
+    let checkoutDetails;
+    let log_details = { request_id };
+    let paypal_request_sale_service;
+
+    try {
+      checkoutDetails = await paypal.setupCheckout(details);
+    } catch (err) {
+      const {err: httpErr, response} = err
+      paypal_request_sale_service = Date.now() - paypalRequestSaleStart;
+      log_details.error = httpErr.toString();
+
+      if (response) {
+        log_details.error_name = response.name;
+        log_details.error_message = response.message;
+        log_details.details = response.details;
+      }
+
+      request.log(['paypal', 'sale', 'error', frequency], log_details);
+
+      return Boom.boomify(httpErr, 500, 'Paypal donation failed');
+    }
+
+    paypal_request_sale_service = Date.now() - paypalRequestSaleStart;
+
+    request.log(['paypal', 'sale', frequency], log_details);
+
+    return h.response({
+      endpoint: process.env.PAYPAL_ENDPOINT,
+      token: checkoutDetails.TOKEN
+    }).code(200);
   },
-  'paypal-redirect': function(request, reply) {
+  'paypal-redirect': async function(request, h) {
     var locale = request.params.locale || '';
     if (locale) {
       locale = '/' + locale;
@@ -475,11 +487,16 @@ const routes = {
     };
     var request_id = request.headers['x-request-id'];
     if (frequency !== 'monthly') {
-      paypal.getCheckoutDetails({
-        token: request.url.query.token
-      }, options, function(err, checkoutDetails) {
-        var paypal_checkout_details_service = checkoutDetails.paypal_checkout_details_service;
-        if (err) {
+      let checkoutDetails;
+      let paypal_checkout_details_service
+
+      const paypalCheckoutDetailsStart = Date.now();
+      try {
+        checkoutDetails = await paypal.getCheckoutDetails({
+          token: request.url.query.token
+        }, options);
+      } catch (err) {
+          paypal_checkout_details_service = Date.now() - paypalCheckoutDetailsStart;
           request.log(['error', 'paypal', 'checkout-details', frequency], {
             request_id,
             paypal_checkout_details_service,
@@ -488,55 +505,63 @@ const routes = {
             error_message: checkoutDetails.response.message,
             details: checkoutDetails.response.details
           });
-          return reply(Boom.badRequest('donation failed', err));
+          return Boom.badRequest('donation failed', err);
+      }
+
+      paypal_checkout_details_service = Date.now() - paypalCheckoutDetailsStart;
+
+      request.log(['paypal', 'checkout-details', frequency], {
+        request_id,
+        paypal_checkout_details_service
+      });
+
+      let checkoutData;
+      let paypal_checkout_payment_service;
+      let log_details = {
+        request_id,
+      };
+
+      const paypalCheckoutPaymentStart = Date.now();
+
+      try {
+        checkoutData = await paypal.completeCheckout(checkoutDetails.response, options);
+      } catch (err) {
+        paypal_checkout_payment_service = Date.now() - paypalCheckoutPaymentStart;
+        log_details.paypal_checkout_payment_service = paypal_checkout_payment_service;
+
+        log_details.error = err.toString();
+
+        if (checkoutData.response) {
+          log_details.error_name = checkoutData.response.name;
+          log_details.error_message = checkoutData.response.message;
+          log_details.details = checkoutData.response.details;
         }
 
-        request.log(['paypal', 'checkout-details', frequency], {
-          request_id,
-          paypal_checkout_details_service
-        });
+        request.log(['error', 'paypal', 'checkout-payment', frequency], log_details);
+        return Boom.badRequest('donation failed', err);
+      }
 
-        paypal.completeCheckout(checkoutDetails.response, options, function(err, data) {
-          var paypal_checkout_payment_service = data.paypal_checkout_payment_service;
-          var log_details = {
-            request_id,
-            paypal_checkout_payment_service
-          };
+      paypal_checkout_payment_service = Date.now() - paypalCheckoutPaymentStart;
 
-          if (err) {
-            log_details.error = err.toString();
+      request.log(['paypal', 'checkout', frequency], log_details);
 
-            if (data.response) {
-              log_details.error_name = data.response.name;
-              log_details.error_message = data.response.message;
-              log_details.details = data.response.details;
-            }
+      var timestamp = new Date(checkoutData.txn.PAYMENTINFO_0_ORDERTIME).getTime() / 1000;
 
-            request.log(['error', 'paypal', 'checkout-payment', frequency], log_details);
-            return reply(Boom.badRequest('donation failed', err));
-          }
-
-          request.log(['paypal', 'checkout', frequency], log_details);
-
-          var timestamp = new Date(data.txn.PAYMENTINFO_0_ORDERTIME).getTime() / 1000;
-
-          basket.queue({
-            event_type: "donation",
-            first_name: checkoutDetails.response.FIRSTNAME,
-            last_name: checkoutDetails.response.LASTNAME,
-            email: checkoutDetails.response.EMAIL,
-            donation_amount: data.txn.PAYMENTREQUEST_0_AMT,
-            currency: data.txn.CURRENCYCODE,
-            created: timestamp,
-            recurring: false,
-            service: 'paypal',
-            transaction_id: data.txn.PAYMENTINFO_0_TRANSACTIONID,
-            project: appName
-          });
-
-          reply.redirect(`${locale}/${location}/?frequency=${frequency}&tx=${data.txn.PAYMENTINFO_0_TRANSACTIONID}&amt=${data.txn.PAYMENTREQUEST_0_AMT}&cc=${data.txn.CURRENCYCODE}`);
-        });
+      basket.queue({
+        event_type: "donation",
+        first_name: checkoutDetails.response.FIRSTNAME,
+        last_name: checkoutDetails.response.LASTNAME,
+        email: checkoutDetails.response.EMAIL,
+        donation_amount: checkoutData.txn.PAYMENTREQUEST_0_AMT,
+        currency: checkoutData.txn.CURRENCYCODE,
+        created: timestamp,
+        recurring: false,
+        service: 'paypal',
+        transaction_id: checkoutData.txn.PAYMENTINFO_0_TRANSACTIONID,
+        project: appName
       });
+
+      return h.redirect(`${locale}/${location}/?frequency=${frequency}&tx=${checkoutData.txn.PAYMENTINFO_0_TRANSACTIONID}&amt=${data.txn.PAYMENTREQUEST_0_AMT}&cc=${data.txn.CURRENCYCODE}`);
     } else {
       paypal.getCheckoutDetails({
         token: request.url.query.token
@@ -579,7 +604,7 @@ const routes = {
             }
 
             request.log(['error', 'paypal', 'checkout-payment', frequency], log_details);
-            return reply(Boom.Boomify(err));
+            return reply(Boom.boomify(err));
           }
 
           request.log(['paypal', 'checkout', frequency], log_details);
