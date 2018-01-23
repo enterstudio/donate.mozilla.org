@@ -1,4 +1,4 @@
-const boom = require('boom');
+const Boom = require('boom');
 const hatchet = require('hatchet');
 
 const listSignup = require('./signup');
@@ -6,7 +6,7 @@ const listSignup = require('./signup');
 const url = process.env.SIGNUP;
 
 async function signupRoutes(transaction) {
-  const payload = {
+  const form = {
     format: 'html',
     lang: transaction.locale,
     newsletters: 'mozilla-foundation',
@@ -19,13 +19,13 @@ async function signupRoutes(transaction) {
   return new Promise((resolve, reject) => {
     hatchet.send(
       "send_post_request",
-      { url, json, form },
+      { url, form, json: true },
       (err, response) => {
         if (err) {
           return reject(err);
         }
 
-        resolve(payload);
+        resolve(form);
       }
     );
   })
@@ -34,9 +34,10 @@ async function signupRoutes(transaction) {
 module.exports = async function(request, h) {
   const transaction = request.payload;
   const signup_service = Date.now();
+  let form;
 
   try {
-    const payload = await signupRoutes(transaction);
+    form = await signupRoutes(transaction);
   } catch (err) {
     request.log(['error', 'signup'], {
       request_id: request.headers['x-request-id'],
@@ -46,7 +47,7 @@ module.exports = async function(request, h) {
       param: err.param
     });
 
-    return boom.wrap(err, 500, 'Unable to complete Basket signup');
+    return Boom.boomify(err, 500, 'Unable to complete Basket signup');
   }
 
   request.log(['signup'], {
@@ -54,5 +55,5 @@ module.exports = async function(request, h) {
     service: Date.now() - signup_service
   });
 
-  return h.response(payload).code(201);
+  return h.response(form).code(201);
 }

@@ -111,8 +111,7 @@ function routeFileContent(locales) {
             resolve(h.redirect(`${location}${locale}/${search}`));
           } else {
             // Finally, send a full HTML document over to the client
-            console.log("asdf");
-            resolve(h.response(generateHTML(renderProps)).type('text/html').code(200));
+            resolve(generateHTML(renderProps)).type('text/html').code(200);
           }
         }
       });
