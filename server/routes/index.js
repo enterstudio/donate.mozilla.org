@@ -655,18 +655,18 @@ const routes = {
       return h.redirect(`${locale}/${location}/?frequency=${frequency}&tx=${transaction_id}&amt=${donation_amount}&cc=${currency}`);
     }
   },
-  'stripe-charge-refunded': function(request, reply) {
+  'stripe-charge-refunded': function(request, h) {
     let endpointSecret = process.env.STRIPE_WEBHOOK_SIGNATURE_CHARGE_REFUNDED;
     let signature = request.headers["stripe-signature"];
 
     let event = stripe.constructEvent(request.payload, signature, endpointSecret);
 
     if (!event) {
-      return reply(Boom.forbidden('An error occurred while verifying the webhook signing secret'));
+      return Boom.forbidden('An error occurred while verifying the webhook signing secret');
     }
 
     if (event.type !== 'charge.refunded') {
-      return reply('This hook only processes charge.refunded events');
+      return h.response('This hook only processes charge.refunded events');
     }
 
     let event_type = event.type;
@@ -689,146 +689,126 @@ const routes = {
       status
     });
 
-    return reply("charge event processed");
+    return h.response("charge event processed");
   },
-  'stripe-dispute': function(request, reply) {
-    let endpointSecret = process.env.STRIPE_WEBHOOK_SIGNATURE_DISPUTE;
-    let signature = request.headers["stripe-signature"];
-
-    let event = stripe.constructEvent(request.payload, signature, endpointSecret);
+  'stripe-dispute': async function(request, h) {
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SIGNATURE_DISPUTE;
+    const signature = request.headers["stripe-signature"];
+    const event = stripe.constructEvent(request.payload, signature, endpointSecret);
 
     if (!event) {
-      return reply(Boom.forbidden('An error occurred while verifying the webhook signing secret'));
+      return Boom.forbidden('An error occurred while verifying the webhook signing secret');
     }
 
-
-    let disputeEvents = [
+    const disputeEvents = [
       'charge.dispute.closed',
       'charge.dispute.created',
       'charge.dispute.updated'
     ];
 
-
     if (disputeEvents.indexOf(event.type) === -1) {
-      return reply('This hook only processes disputes');
+      return h.response('This hook only processes disputes');
     }
 
-    let dispute = event.data.object;
+    const {
+      id: transaction_id,
+      status,
+      reason
+    } = event.data.object;
 
-    // kick off a Promise Chain
-    Promise.resolve()
-      .then(function() {
-      // close the dispute automatically if it's not lost already
-        if (event === 'charge.dispute.created' && dispute.status === 'lost') {
-          return Promise.resolve();
-        }
+    const event_type = event.type;
 
-        return stripe.closeDispute(dispute.id)
-          .catch(function(closeDisputeError) {
-            if (closeDisputeError.message === 'This dispute is already closed') {
-              return console.log(closeDisputeError.message);
-            }
+    if (event_type === 'charge.dispute.created' && status === 'lost') {
+      try {
+        await stripe.closeDispute(dispute.id);
+        // statements
+      } catch(err) {
+          if (err.message === 'This dispute is already closed') {
+            return console.log(err.message);
+          }
 
-            return Promise.reject("Could not close the dispute");
-          });
-      })
-      .then(function() {
-        basket.queue({
-          event_type: event.type,
-          transaction_id: dispute.charge,
-          reason: dispute.reason,
-          status: dispute.status
-        });
+          return Boom.badRequest("Could not close the dispute");
+      }
+    }
 
-        reply("dispute processed");
-      })
-      .catch(function(err) {
-        if (err.isBoom) {
-          return reply(err);
-        }
+    basket.queue({ event_type, transaction_id, reason, status });
 
-        return reply(Boom.badImplementation('An error occurred while handling the dispute webhook', err));
-      });
-
-
+    return h.response("dispute processed");
   },
-  'stripe-charge-succeeded': function(request, reply) {
+  'stripe-charge-succeeded': async function(request, h) {
     let endpointSecret = process.env.STRIPE_WEBHOOK_SIGNATURE_CHARGE_SUCCESS;
     let signature = request.headers["stripe-signature"];
 
     let event = stripe.constructEvent(request.payload, signature, endpointSecret);
 
     if (!event) {
-      return reply(Boom.forbidden('An error occurred while verifying the webhook signing secret'));
+      return Boom.forbidden('An error occurred while verifying the webhook signing secret');
     }
 
-    let charge = event.data.object;
+    let { id } = event.data.object;
 
     if (event.type !== 'charge.succeeded') {
       return reply('This hook only processes charge succeeded events');
     }
 
-    stripe.retrieveCharge(
-      charge.id,
-      function(fetchChargeErr, charge) {
-        if (fetchChargeErr) {
-          return reply(Boom.badImplementation('An error occurred while fetching the invoice for this charge', fetchChargeErr));
-        }
+    let charge;
 
-        if (!charge.invoice || !charge.invoice.subscription) {
-          return reply('Charge not part of a subscription');
-        }
+    try {
+      charge = await stripe.retrieveCharge(id);
+    } catch(err) {
+      return Boom.badImplementation('An error occurred while fetching the invoice for this charge', e);
+    }
 
-        stripe.retrieveSubscription(
-          charge.invoice.customer,
-          charge.invoice.subscription,
-          {
-            expand: ["customer"]
-          },
-          function(retrieveSubscriptionErr, subscription) {
-            if (retrieveSubscriptionErr) {
-              return reply(Boom.badImplementation('An error occurred while fetching the subscription for this charge\'s invoice', retrieveSubscriptionErr));
-            }
+    if (!charge.invoice || !charge.invoice.subscription) {
+      return h.response('Charge not part of a subscription');
+    }
 
-            let updateData = {
-              metadata: subscription.metadata
-            };
+    let {
+      customer: customer,
+      subscription: subscription
+    } = charge.invoice;
 
-            if (updateData.metadata.thunderbird) {
-              updateData.description = 'Thunderbird monthly';
-            } else if (updateData.metadata.glassroomnyc) {
-              updateData.description = 'glassroomnyc monthly';
-            } else {
-              updateData.description = 'Mozilla Foundation Monthly Donation';
-            }
+    try {
+      subscription = stripe.retrieveSubscription(customer, subscription, { expand: ['customer'] });
+    } catch(err) {
+      return reply(Boom.badImplementation('An error occurred while fetching the subscription for this charge\'s invoice', err));
+    }
 
-            // capture recurring stripe transactions in salesforce
-            basket.queue({
-              event_type: "donation",
-              last_name: subscription.customer.sources.data[0].name,
-              email: subscription.customer.email,
-              donation_amount: basket.zeroDecimalCurrencyFix(charge.amount, charge.currency),
-              currency: charge.currency,
-              created: charge.created,
-              recurring: true,
-              frequency: "monthly",
-              service: "stripe",
-              transaction_id: charge.id,
-              subscription_id: subscription.id,
-              project: updateData.metadata.thunderbird ? "thunderbird" : ( updateData.metadata.glassroomnyc ? "glassroomnyc" : "mozillafoundation" )
-            });
+    let updateData = {
+      metadata: subscription.metadata
+    };
 
-            stripe.updateCharge(charge.id, updateData, function(updateChargeErr) {
-              if (updateChargeErr) {
-                return reply(Boom.badImplementation('An error occurred while updating the charge'));
-              }
+    if (updateData.metadata.thunderbird) {
+      updateData.description = 'Thunderbird monthly';
+    } else if (updateData.metadata.glassroomnyc) {
+      updateData.description = 'glassroomnyc monthly';
+    } else {
+      updateData.description = 'Mozilla Foundation Monthly Donation';
+    }
 
-              reply('Charge updated');
-            });
-          }
-        );
-      }
-    );
+    // capture recurring stripe transactions in salesforce
+    basket.queue({
+      event_type: "donation",
+      last_name: subscription.customer.sources.data[0].name,
+      email: subscription.customer.email,
+      donation_amount: basket.zeroDecimalCurrencyFix(charge.amount, charge.currency),
+      currency: charge.currency,
+      created: charge.created,
+      recurring: true,
+      frequency: "monthly",
+      service: "stripe",
+      transaction_id: charge.id,
+      subscription_id: subscription.id,
+      project: updateData.metadata.thunderbird ? "thunderbird" : ( updateData.metadata.glassroomnyc ? "glassroomnyc" : "mozillafoundation" )
+    });
+
+    try {
+      await stripe.updateCharge(charge.id, updateData);
+    } catch(err) {
+      return Boom.badImplementation('An error occurred while updating the charge');
+    }
+
+    return h.response('Charge updated');
   },
   'stripe-charge-failed': require('./webhooks/stripe-charge-failed.js')
 };

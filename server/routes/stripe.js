@@ -17,13 +17,13 @@ const stripeRoutes = {
     return stripe.charges.create({ amount, currency, customer, description, metadata });
   },
   recurring: function(transaction, callback) {
-    const { currency: plan, quantity, metadata, trialPeriodDays } = transaction;
+    const { currency: plan, quantity, metadata, t } = transaction;
     const {  id: customerId } = transaction.customer;
 
     const subscription = { plan, quantity, metadata };
 
-    if (trialPeriodDays) {
-      subscription.trial_period_days = trialPeriodDays;
+    if (transaction.trialPeriodDays) {
+      subscription.trial_period_days = transaction.trialPeriodDays;
     }
 
     return stripe.customers.createSubscription(customerId, subscription);
@@ -31,21 +31,21 @@ const stripeRoutes = {
   closeDispute: function(disputeId) {
     return stripe.disputes.close(disputeId);
   },
-  updateCharge: function(chargeId, updateData, callback) {
-    stripe.charges.update(chargeId, updateData, callback);
+  updateCharge: function(chargeId, updateData) {
+    return stripe.charges.update(chargeId, updateData);
   },
   retrieveDispute: function(disputeId) {
     return stripe.disputes.retrieve(disputeId, {
       expand: ["charge"]
     });
   },
-  retrieveCharge: function(chargeId, callback) {
-    stripe.charges.retrieve(chargeId, {
+  retrieveCharge: function(chargeId) {
+    return stripe.charges.retrieve(chargeId, {
       expand: ["invoice"]
-    }, callback);
+    });
   },
-  retrieveSubscription: function(customerId, subscriptionId, options, callback) {
-    stripe.customers.retrieveSubscription(customerId, subscriptionId, options, callback);
+  retrieveSubscription: function(customerId, subscriptionId, options) {
+    return stripe.customers.retrieveSubscription(customerId, subscriptionId, options);
   },
   retrieveCustomer: function(customerId, callback) {
     return stripe.customers.retrieve(customerId);

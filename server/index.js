@@ -15,7 +15,7 @@ module.exports = async function(options) {
   const serverOptions = getServerOptions(options);
   const server = new Hapi.Server(serverOptions);
 
-  await server.register(require("hapi-auth-bearer-token"));
+  await server.register(AuthBearer);
 
   server.auth.strategy("stripe", "bearer-access-token", {
     validate: (request, token, h) => {
