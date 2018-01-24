@@ -187,7 +187,7 @@ var baseRoutes = [
   }, {
     method: 'GET',
     path: '/api/client-env.js',
-    handler: async function(request, h) {
+    handler: function(request, h) {
       //
       // WARNING! Only put variables safe for public consumption here! This is emitted on the client side!
       //
