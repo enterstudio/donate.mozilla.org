@@ -53,12 +53,9 @@ function setupPaypal(transaction) {
       form: charge
     }, function(err, httpResponse, body) {
       if (err) {
-        return reject({
-          err,
-          response: querystring.parse(body)
-        });
+        return reject(err);
       }
-      console.log(querystring.parse(body));
+
       resolve(querystring.parse(body));
     });
   });
