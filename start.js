@@ -8,7 +8,7 @@ async function start() {
   await server.start();
   server.log('info', 'Running server at: ' + server.info.uri);
 
-  var shutdown = async () => {
+  var shutdown = async() => {
     // instruct hapi to stop accepting incoming requests, and to
     // wait fifteen seconds before forcefully terminating existing connections.
     // We do this so that we don't interrupt in-flight and queued requests

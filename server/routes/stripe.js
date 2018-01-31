@@ -17,7 +17,7 @@ const stripeRoutes = {
     return stripe.charges.create({ amount, currency, customer, description, metadata });
   },
   recurring: function(transaction, callback) {
-    const { currency: plan, quantity, metadata, t } = transaction;
+    const { currency: plan, quantity, metadata } = transaction;
     const {  id: customerId } = transaction.customer;
 
     const subscription = { plan, quantity, metadata };

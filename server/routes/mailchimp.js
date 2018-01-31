@@ -4,8 +4,13 @@ const user = process.env.MAILCHIMP_ACCOUNT_NAME;
 const pass = process.env.MAILCHIMP_API_KEY;
 const auth = { user, pass };
 
-function sendRequest() {
+function sendRequest(body) {
   return new Promise((resolve, reject) => {
+    // Mailchimp API keys store two parts in the key itself seperated via a dash.
+    const splitMailchimpApiKey = pass.split("-");
+    const dc = splitMailchimpApiKey[1] || "";
+    const url = `https://${dc}.api.mailchimp.com/3.0/lists/${mailchimpListId}/members/`;
+
     httpRequest.post({ url, auth, body }, (err, payload) => {
       if (err) {
         return reject(err);
@@ -17,17 +22,11 @@ function sendRequest() {
 }
 
 module.exports = async function mailChimp(transaction) {
-  callback = callback || function() {};
-  if (!mailchimpApiKey) {
+  if (!pass) {
     console.warn("missing mailchimp API key");
     return;
   }
-  // Mailchimp API keys store two parts in the key itself seperated via a dash.
-  const splitMailchimpApiKey = mailchimpApiKey.split("-");
-  const dc = splitMailchimpApiKey[1] || "";
-  const apiKey = splitMailchimpApiKey[0] || "";
 
-  const url = `https://${dc}.api.mailchimp.com/3.0/lists/${mailchimpListId}/members/`;
   const body = JSON.stringify({
     email_address: transaction.email,
     status: "pending",
@@ -37,5 +36,5 @@ module.exports = async function mailChimp(transaction) {
     }
   });
 
-  return await sendRequest(url, body);
+  return await sendRequest(body);
 };

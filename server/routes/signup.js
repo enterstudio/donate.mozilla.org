@@ -1,8 +1,5 @@
 const Boom = require('boom');
 const hatchet = require('hatchet');
-
-const listSignup = require('./signup');
-
 const url = process.env.SIGNUP;
 
 async function signupRoutes(transaction) {
@@ -28,8 +25,8 @@ async function signupRoutes(transaction) {
         resolve(form);
       }
     );
-  })
-};
+  });
+}
 
 module.exports = async function(request, h) {
   const transaction = request.payload;
@@ -56,4 +53,4 @@ module.exports = async function(request, h) {
   });
 
   return h.response(form).code(201);
-}
+};

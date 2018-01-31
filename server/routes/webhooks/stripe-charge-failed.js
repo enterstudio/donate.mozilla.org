@@ -45,8 +45,8 @@ let stripeChargeFailed = (request, h) => {
   // Expand the invoice object on the charge
   try {
     charge = stripe.retrieveCharge(charge.id);
-  } catch(err) {
-    return Boom.badImplementation(`${expandChargeError}: ${fetchChargeError}`);
+  } catch (err) {
+    return Boom.badImplementation(`${expandChargeError}: ${err}`);
   }
 
   // Unlikely, but ensure there's a subscription object to work with
@@ -59,8 +59,8 @@ let stripeChargeFailed = (request, h) => {
   // Expand the subscription object
   try {
     subscription = stripe.retrieveSubscription(customer, subscription, { expand: ["customer"] });
-  } catch(err) {
-    return Boom.badImplementation(`${retrieveSubscriptionErrorMsg}: ${retrieveSubscriptionError}`);
+  } catch (err) {
+    return Boom.badImplementation(`${retrieveSubscriptionErrorMsg}: ${err}`);
 
   }
 

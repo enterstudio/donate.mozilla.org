@@ -62,7 +62,6 @@ function setupPaypal(transaction) {
 }
 
 function getCheckoutDetails(transaction, options) {
-  var paypalCheckoutDetailsStart = Date.now();
   var paypalCreds = accountSwitcher.creds[options.accountType];
 
   return new Promise((resolve, reject) => {
@@ -78,7 +77,6 @@ function getCheckoutDetails(transaction, options) {
         TOKEN: transaction.token
       }
     }, function(err, httpResponse, body) {
-      var data = querystring.parse(body);
       if (err) {
         return reject(err);
       }
@@ -89,7 +87,6 @@ function getCheckoutDetails(transaction, options) {
 }
 
 function doExpressCheckoutPayment(checkoutDetails, options) {
-  var paypalCheckoutPaymentStart = Date.now();
   var paypalCreds = accountSwitcher.creds[options.accountType];
 
   var recurring = options.recurring;

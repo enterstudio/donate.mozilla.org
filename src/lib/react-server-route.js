@@ -115,7 +115,7 @@ function routeFileContent(locales) {
           }
         }
       });
-    })
+    });
   };
 }
 

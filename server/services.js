@@ -23,26 +23,35 @@ if (process.env.NPM_CONFIG_PRODUCTION === 'true') {
   };
 }
 
-var services = [
-  {plugin: require('inert')},
-  {
+let services = [];
+
+services.unshift({ plugin: require('inert') });
+
+// Optionally disable request logging
+if (!process.env.DISABLE_LOGGING) {
+  services.unshift({
     plugin: require('good'),
     options: {
       ops: false,
       reporters: {
-        defaultReporter: [{
-          module: 'good-squeeze',
-          name: 'Squeeze',
-          args: [squeezeArgs]
-        },
-        {
-          module: 'good-console'
-        },
-        'stdout'
-      ]}
+        defaultReporter: [
+          {
+            module: 'good-squeeze',
+            name: 'Squeeze',
+            args: [squeezeArgs]
+          },
+          {
+            module: 'good-console'
+          },
+          'stdout'
+        ]
+      }
     }
-  },
-  {plugin: require('scooter')},
+  });
+}
+
+services.unshift(
+  { plugin: require('scooter') },
   {
     plugin: require('blankie'),
     options: {
@@ -61,6 +70,6 @@ var services = [
       mediaSrc: ['https://d24kjznqej0s8a.cloudfront.net', 'https://assets.mofoprod.net']
     }
   }
-];
+);
 
 module.exports = services;
