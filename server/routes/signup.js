@@ -3,6 +3,7 @@ const hatchet = require('hatchet');
 const url = process.env.SIGNUP;
 
 async function signupRoutes(transaction) {
+  console.log(transaction);
   const form = {
     format: 'html',
     lang: transaction.locale,
@@ -30,6 +31,7 @@ async function signupRoutes(transaction) {
 
 module.exports = async function(request, h) {
   const transaction = request.payload;
+  console.log(request.payload);
   const signup_service = Date.now();
   let form;
 

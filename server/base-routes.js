@@ -1,16 +1,16 @@
-var routes = require('./routes');
+const routes = require('./routes');
 
-var Joi = require('joi');
+const Joi = require('joi');
 
-var locales = require('./locales');
-var getLocale = require('../dist/lib/get-locale');
-var polyfillio = require('polyfill-service');
-var PolyfillSet = require('./lib/PolyfillSet');
+const locales = require('./locales');
+const getLocale = require('../dist/lib/get-locale');
+const polyfillio = require('polyfill-service');
+const PolyfillSetFromQueryParams = require('./lib/PolyfillSet');
 
-var currencyFor = require('./lib/currency-for');
-var exchangeRates = require('../assets/exchange-rates/latest.json');
+const currencyFor = require('./lib/currency-for');
+const exchangeRates = require('../assets/exchange-rates/latest.json');
 
-var baseRoutes = [
+const baseRoutes = [
   {
     method: 'POST',
     path: '/api/signup/basket',
@@ -164,7 +164,7 @@ var baseRoutes = [
       var features = request.query.features + ',Intl.~locale.' + locale;
       var flags = request.query.flags ? request.query.flags.split(',') : [];
 
-      var polyfills = PolyfillSet.fromQueryParam(features || 'default', flags);
+      var polyfills = PolyfillSetFromQueryParams(features || 'default', flags);
       var params = {
         features: polyfills.get(),
         minify: true,

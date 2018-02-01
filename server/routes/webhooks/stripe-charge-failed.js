@@ -18,16 +18,16 @@ const notRecurringCharge = 'This hook only processes recurring charges that fail
 const notPartOfSubscription = 'This charge is not part of a subscription';
 const successMessage = 'charge failed event processed';
 
-let stripeChargeFailed = (request, h) => {
+const stripeChargeFailed = (request, h) => {
   // Validate the Webhook signature
-  let endpointSecret = process.env.STRIPE_WEBHOOK_SIGNATURE_CHARGE_FAILED;
-  let signature = request.headers[signatureHeader];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SIGNATURE_CHARGE_FAILED;
+  const signature = request.headers[signatureHeader];
 
-  let event = stripe.constructEvent(request.payload, signature, endpointSecret);
+  const event = stripe.constructEvent(request.payload, signature, endpointSecret);
 
   // If there's no event object, the signature verification failed
   if (!event) {
-    return Boom.forbidden(forbiddenError);
+    throw Boom.forbidden(forbiddenError);
   }
 
   // Only process charge.failed webhook events
@@ -46,7 +46,7 @@ let stripeChargeFailed = (request, h) => {
   try {
     charge = stripe.retrieveCharge(charge.id);
   } catch (err) {
-    return Boom.badImplementation(`${expandChargeError}: ${err}`);
+    throw Boom.badImplementation(`${expandChargeError}: ${err}`);
   }
 
   // Unlikely, but ensure there's a subscription object to work with
@@ -60,7 +60,7 @@ let stripeChargeFailed = (request, h) => {
   try {
     subscription = stripe.retrieveSubscription(customer, subscription, { expand: ["customer"] });
   } catch (err) {
-    return Boom.badImplementation(`${retrieveSubscriptionErrorMsg}: ${err}`);
+    throw Boom.badImplementation(`${retrieveSubscriptionErrorMsg}: ${err}`);
 
   }
 
@@ -68,19 +68,19 @@ let stripeChargeFailed = (request, h) => {
   // Since this charge failed, we need to pass enough information
   // for the CRM to create a new Opportunity record, and mark it
   // immediately as 'Lost'
-  let {
+  const {
     currency,
     created,
     id: transaction_id,
     failure_code
   } = charge;
 
-  let {
+  const {
     id: subscription_id,
     metadata
   } = subscription;
 
-  let last_name = subscription.customer.sources.data[0].name,
+  const last_name = subscription.customer.sources.data[0].name,
     email = subscription.customer.email,
     donation_amount = basket.zeroDecimalCurrencyFix(charge.amount, charge.currency),
     project = metadata.thunderbird ? "thunderbird" : ( metadata.glassroomnyc ? "glassroomnyc" : "mozillafoundation" );
